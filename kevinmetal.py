@@ -17,7 +17,6 @@ soundspath = "./sounds/"
 class Kevin(commands.Cog):
     #Global vars
     vClient = None
-    thread = None
     allSounds = None
     treadStarted = False
 
@@ -32,14 +31,14 @@ class Kevin(commands.Cog):
         if not self.treadStarted:
             self.refreshsounds()
             self.treadStarted = True
-            self.playSound()
+            self.playRandomSound(True)
             await ctx.send("J'arrive !")
 
     @commands.command()
     async def true_help(self, ctx):
         await ctx.send("Alors : \n $help : Affiche ce mess'\n $kevin : J'viens vous tenir companie dans le voice chat\n $addsound : Ajoute + de bonheur dans mon soundboard. T'faut link un son en pièce jointe !\n $daronned : J'pense t'as pas besoin d'explication...")
 
-
+    
     @commands.command()
     async def addsound(self, ctx):
         message = ctx.message.content
@@ -57,12 +56,23 @@ class Kevin(commands.Cog):
 
     @commands.command()
     async def daronned(self, ctx):
-        print('stop')
-        """Stops and disconnects the bot from voice"""
-        if self.thread.is_alive():
-            self.thread.cancel()
-        await ctx.send("ça va j'ai compris :unamused:")
-        await ctx.voice_client.disconnect()
+        try:
+            print('stop')
+            """Stops and disconnects the bot from voice"""
+            await ctx.send("ça va j'ai compris :unamused:")
+            await ctx.voice_client.disconnect()
+        except Exception as error:
+            # handle the exception
+            print("An exception occurred:", error) # An exception occurred: division by zero
+
+    @commands.command()
+    async def parle(self, ctx): #Plays a random sound
+        self.playRandomSound(False)
+
+    @commands.command()
+    async def refresh(self, ctx):
+        self.refreshsounds()
+
 
     @kevin.before_invoke
     async def ensure_voice(self, ctx):
@@ -76,24 +86,30 @@ class Kevin(commands.Cog):
         elif ctx.voice_client.is_playing():
             ctx.voice_client.stop()
 
-    # Utility 
-    def playSound(self):
+    def playRandomSound(self, restart):        
         soundNumber = random.randrange(0, len(self.allSounds) - 1)
-        print(f'played sound {soundNumber}')
+        self.playSound(soundNumber, restart)
+
+    # Utility    
+    def playSound(self, number, restart):
+        print(f'played sound {number}')
         if self.vClient.is_playing():
-            self.thread = threading.Timer(3, self.playSound).start()
+            threading.Timer(0.5, self.playSound, [number, restart]).start()
             return
 
-        source = discord.FFmpegOpusAudio(f'sounds/{self.allSounds[soundNumber]}')
-        self.vClient.play(source)
+        source = discord.FFmpegOpusAudio(f'sounds/{self.allSounds[number]}')
         if self.vClient.is_connected():
-            delay = random.randrange(minTime, maxTime)
-            print(f"Next sound in : {delay}")
-            self.thread = threading.Timer(delay, self.playSound).start()
+            self.vClient.play(source)
+            if restart:
+                delay = random.randrange(minTime, maxTime)
+                print(f"Next sound in : {delay}")
+                threading.Timer(delay, self.playRandomSound, [restart]).start()
 
     def refreshsounds(self):
         self.allSounds = [f for f in listdir(soundspath) if isfile(join(soundspath, f))]
-
+        print(f"loaded {len(self.allSounds)} sounds")
+        print(self.allSounds)
+    
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -107,8 +123,6 @@ bot = commands.Bot(
 @bot.event
 async def on_ready():
     print(f'Logged in as {bot.user} (ID: {bot.user.id})')
-    print(f"loaded {len(allSounds)} sounds")
-    print(allSounds)
     print('------')
 
 
